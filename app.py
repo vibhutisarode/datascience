@@ -28,7 +28,8 @@ try:
 
         #data_transformation_config=DataTransformationConfig()
         data_transformation=DataTransformation()
-        train_arr,test_arr,_=data_transformation.initiate_data_transormation(train_data_path,test_data_path)
+        train_arr, test_arr, _ = data_transformation.initiate_data_transformation(train_data_path, test_data_path)
+
 
         ## Model Training
 
