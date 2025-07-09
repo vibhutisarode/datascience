@@ -22,6 +22,17 @@ from src.ENDTOENDDSPROJECT.exception import CustomException
 from src.ENDTOENDDSPROJECT.logger import logging
 from src.ENDTOENDDSPROJECT.utils import save_object,evaluate_models
 
+              
+import dagshub
+dagshub.init(repo_owner='vibhutisarode',
+             repo_name='datascience',
+             mlflow=True)
+
+import mlflow
+with mlflow.start_run():
+  mlflow.log_param('parameter name', 'value')
+  mlflow.log_metric('metric name', 1)
+
 
 @dataclass
 class ModelTrainerConfig:
@@ -117,7 +128,7 @@ class ModelTrainer:
 
             best_params = params[actual_model]
 
-            mlflow.set_registry_uri("https://dagshub.com/krishnaik06/mlprojecthindi.mlflow")
+            mlflow.set_registry_uri("")
             tracking_url_type_store = urlparse(mlflow.get_tracking_uri()).scheme
 
             # mlflow
