@@ -4,8 +4,12 @@ from src.ENDTOENDDSPROJECT.exception import CustomException
 from src.ENDTOENDDSPROJECT.logger import logging
 import pandas as pd
 from dotenv import load_dotenv
+from sklearn.model_selection import GridSearchCV
+from sklearn.metrics import r2_score
 import pymysql
 
+import pickle
+import numpy as np
 
 load_dotenv()
 
@@ -26,7 +30,7 @@ def read_sql_data():
             db=db
         )
         logging.info("Connection Established",mydb)
-        df=pd.read_sql_query('Select * from cleaned',mydb)
+        df=pd.read_sql_query('Select * from students',mydb)
         print(df.head())
 
         return df
@@ -62,10 +66,20 @@ def evaluate_models(X_train, y_train,X_test,y_test,models,param):
             model.set_params(**gs.best_params_)
             model.fit(X_train,y_train)
 
-           
+            model.fit(X_train, y_train)  # Train model
+
+            y_train_pred = model.predict(X_train)
+
+            y_test_pred = model.predict(X_test)
+
+            train_model_score = r2_score(y_train, y_train_pred)
+
+            test_model_score = r2_score(y_test, y_test_pred)
+
+            report[list(models.keys())[i]] = test_model_score
+            report[list(models.keys())[i]] = train_model_score
+
         return report
 
     except Exception as e:
         raise CustomException(e, sys)
-
-    
