@@ -35,6 +35,6 @@ try:
         model_trainer=ModelTrainer()
         print(model_trainer.initiate_model_trainer(train_arr,test_arr))
         
-    except Exception as e:
+except Exception as e:
         logging.info("Custom Exception")
         raise CustomException(e,sys)
