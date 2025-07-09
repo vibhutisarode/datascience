@@ -11,7 +11,17 @@ import sys
 if __name__=="__main__":
     logging.info("The execution has started")
 
-    try:
+    import dagshub
+dagshub.init(repo_owner='vibhutisarode',
+             repo_name='datascience',
+             mlflow=True)
+
+import mlflow
+with mlflow.start_run():
+  mlflow.log_param('parameter name', 'value')
+  mlflow.log_metric('metric name', 1)
+
+try:
         #data_ingestion_config=DataIngestionConfig()
         data_ingestion=DataIngestion()
         train_data_path,test_data_path=data_ingestion.initiate_data_ingestion()
