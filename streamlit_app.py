@@ -8,10 +8,24 @@ from pathlib import Path
 # Get the absolute path to the project directory
 BASE_DIR = Path(__file__).parent.absolute()
 
-# Update paths to use absolute paths
-MODEL_PATH = os.path.join(BASE_DIR, 'artifacts', 'model.pkl')
-PREPROCESSOR_PATH = os.path.join(BASE_DIR, 'artifacts', 'preprocessor.pkl')
-DATA_PATH = os.path.join(BASE_DIR, 'artifacts', 'raw.csv')
+# Define both local and cloud paths
+LOCAL_ARTIFACTS = os.path.join(BASE_DIR, 'artifacts')
+CLOUD_ARTIFACTS = '/mount/src/datascience/artifacts'
+
+# Check which path exists and use it
+ARTIFACTS_DIR = CLOUD_ARTIFACTS if os.path.exists(CLOUD_ARTIFACTS) else LOCAL_ARTIFACTS
+
+# Update paths to use the correct artifacts directory
+MODEL_PATH = os.path.join(ARTIFACTS_DIR, 'model.pkl')
+PREPROCESSOR_PATH = os.path.join(ARTIFACTS_DIR, 'preprocessor.pkl')
+DATA_PATH = os.path.join(ARTIFACTS_DIR, 'raw.csv')
+
+# Print the paths for debugging
+st.sidebar.write("Debug Info:")
+st.sidebar.write(f"Using artifacts from: {ARTIFACTS_DIR}")
+st.sidebar.write(f"Data file exists: {os.path.exists(DATA_PATH)}")
+st.sidebar.write(f"Model file exists: {os.path.exists(MODEL_PATH)}")
+st.sidebar.write(f"Preprocessor file exists: {os.path.exists(PREPROCESSOR_PATH)}")
 
 # Utility functions with error handling
 def load_pickle(path):
