@@ -5,10 +5,32 @@ import pandas as pd
 import os
 
 # Define base directory and artifact paths
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+def get_base_dir():
+    if os.path.exists('/mount/src/datascience'):  # Streamlit Cloud
+        return '/mount/src/datascience'
+    else:  # Local development
+        return os.path.dirname(os.path.abspath(__file__))
+
+BASE_DIR = get_base_dir()
 MODEL_PATH = os.path.join(BASE_DIR, 'artifacts', 'model.pkl')
 PREPROCESSOR_PATH = os.path.join(BASE_DIR, 'artifacts', 'preprocessor.pkl')
 RAW_DATA_PATH = os.path.join(BASE_DIR, 'artifacts', 'raw.csv')
+
+# Print paths for debugging
+st.set_page_config(
+    page_title='Soil Fertility Prediction System',
+    page_icon='🌱',
+    layout='wide',
+    initial_sidebar_state='expanded'
+)
+
+if st.checkbox("Show Debug Info", False):
+    st.write("Current Directory:", os.getcwd())
+    st.write("Base Directory:", BASE_DIR)
+    st.write("Model Path:", MODEL_PATH)
+    st.write("Preprocessor Path:", PREPROCESSOR_PATH)
+    st.write("Raw Data Path:", RAW_DATA_PATH)
+    st.write("Files in artifacts:", os.listdir(os.path.join(BASE_DIR, 'artifacts')) if os.path.exists(os.path.join(BASE_DIR, 'artifacts')) else "artifacts directory not found")
 
 # Utility functions
 def load_pickle(path):
