@@ -3,51 +3,34 @@ import pickle
 import numpy as np
 import pandas as pd
 import os
-from pathlib import Path
 
-# Get the absolute path to the project directory
-BASE_DIR = Path(__file__).parent.absolute()
+# Define base directory and artifact paths
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+MODEL_PATH = os.path.join(BASE_DIR, 'artifacts', 'model.pkl')
+PREPROCESSOR_PATH = os.path.join(BASE_DIR, 'artifacts', 'preprocessor.pkl')
+RAW_DATA_PATH = os.path.join(BASE_DIR, 'artifacts', 'raw.csv')
 
-# Define both local and cloud paths
-LOCAL_ARTIFACTS = os.path.join(BASE_DIR, 'artifacts')
-CLOUD_ARTIFACTS = '/mount/src/datascience/artifacts'
-
-# Check which path exists and use it
-ARTIFACTS_DIR = CLOUD_ARTIFACTS if os.path.exists(CLOUD_ARTIFACTS) else LOCAL_ARTIFACTS
-
-# Update paths to use the correct artifacts directory
-MODEL_PATH = os.path.join(ARTIFACTS_DIR, 'model.pkl')
-PREPROCESSOR_PATH = os.path.join(ARTIFACTS_DIR, 'preprocessor.pkl')
-DATA_PATH = os.path.join(ARTIFACTS_DIR, 'raw.csv')
-
-# Print the paths for debugging
-st.sidebar.write("Debug Info:")
-st.sidebar.write(f"Using artifacts from: {ARTIFACTS_DIR}")
-st.sidebar.write(f"Data file exists: {os.path.exists(DATA_PATH)}")
-st.sidebar.write(f"Model file exists: {os.path.exists(MODEL_PATH)}")
-st.sidebar.write(f"Preprocessor file exists: {os.path.exists(PREPROCESSOR_PATH)}")
-
-# Utility functions with error handling
+# Utility functions
 def load_pickle(path):
     try:
+        if not os.path.exists(path):
+            st.error(f"File not found: {path}")
+            st.info("Please ensure all required model files are present in the artifacts directory.")
+            return None
         with open(path, 'rb') as f:
             return pickle.load(f)
     except Exception as e:
-        st.error(f"Error loading model file: {str(e)}")
-        return None
-
-def load_data():
-    try:
-        return pd.read_csv(DATA_PATH)
-    except Exception as e:
-        st.error(f"Error loading data file: {str(e)}")
+        st.error(f"Error loading file {path}: {str(e)}")
         return None
 
 def predict(features):
     model = load_pickle(MODEL_PATH)
     preprocessor = load_pickle(PREPROCESSOR_PATH)
+    
     if model is None or preprocessor is None:
+        st.error("Could not load model or preprocessor. Please check if all required files are present.")
         return None
+    
     try:
         features_processed = preprocessor.transform(features)
         prediction = model.predict(features_processed)
@@ -55,27 +38,6 @@ def predict(features):
     except Exception as e:
         st.error(f"Error during prediction: {str(e)}")
         return None
-
-def render_developer_section():
-    st.markdown("---")  # Add a divider
-    st.markdown("""
-        <div style='text-align: center; padding: 20px; background-color: rgba(0, 204, 102, 0.1); border-radius: 10px; margin-top: 30px;'>
-            <h4 style='color: #00cc66;'>Developer</h4>
-            <p style='color: white; font-weight: bold; margin: 15px 0; font-size: 1.2em;'>Vibhuti Sarode</p>
-            <p style='color: #cccccc; font-size: 0.9em; margin: 10px 0;'>Data Science Enthusiast</p>
-            <div style='margin-top: 20px;'>
-                <a href='https://www.linkedin.com/in/vibhuti-sarode-a0b736281?utm_source=share&utm_campaign=share_via&utm_content=profile&utm_medium=android_app' target='_blank' style='color: #00cc66; text-decoration: none; margin: 0 10px;'>
-                    <i class='fab fa-linkedin'></i> LinkedIn
-                </a>
-                <a href='https://github.com/vibhutisarode' target='_blank' style='color: #00cc66; text-decoration: none; margin: 0 10px;'>
-                    <i class='fab fa-github'></i> GitHub
-                </a>
-            </div>
-            <div style='margin-top: 10px; font-size: 0.8em; color: #888888;'>
-                <p>📧 vibhutisarode00@gmail.com</p>
-            </div>
-        </div>
-    """, unsafe_allow_html=True)
 
 def home_page():
     # Hero Section
@@ -160,23 +122,20 @@ def home_page():
             <h2 style='color: #00cc66; margin-bottom: 1em;'>Quick Start Guide</h2>
             <div style='display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px;'>
                 <div class='feature-card'>
-                    <h4 style='color: #00cc66;'>1. Input Data</h4>
+                    <h4 style='color: #00cc66; margin-bottom: 10px;'>1. Input Data</h4>
                     <p style='color: #cccccc;'>Enter your soil sample parameters in the prediction page.</p>
                 </div>
                 <div class='feature-card'>
-                    <h4 style='color: #00cc66;'>2. Get Prediction</h4>
+                    <h4 style='color: #00cc66; margin-bottom: 10px;'>2. Get Prediction</h4>
                     <p style='color: #cccccc;'>Receive instant fertility assessment results.</p>
                 </div>
                 <div class='feature-card'>
-                    <h4 style='color: #00cc66;'>3. View Analysis</h4>
+                    <h4 style='color: #00cc66; margin-bottom: 10px;'>3. View Analysis</h4>
                     <p style='color: #cccccc;'>Explore detailed insights and recommendations.</p>
                 </div>
             </div>
         </div>
     """, unsafe_allow_html=True)
-
-    # Add developer section at the bottom
-    render_developer_section()
 
 
 def data_analysis_page():
@@ -189,12 +148,26 @@ def data_analysis_page():
 
     # Load and prepare data
     try:
-        df = load_data()
-        if df is not None:
-            df.fillna(df.mean(numeric_only=True), inplace=True)
-        else:
-            st.error("Could not load the data file. Please check if the file exists in the artifacts directory.")
+        if not os.path.exists(RAW_DATA_PATH):
+            st.error("Data file not found. Please ensure 'raw.csv' is present in the artifacts directory.")
+            st.info(f"Looking for file at: {RAW_DATA_PATH}")
             return
+
+        df = pd.read_csv(RAW_DATA_PATH)
+        if df.empty:
+            st.error("The data file is empty.")
+            return
+
+        # Check for required columns
+        required_columns = ['pH Level', 'Organic Matter (%)', 'Fertility Status', 'Soil Type',
+                          'Nitrogen Content (kg/ha)', 'Phosphorus Content (kg/ha)', 'Potassium Content (kg/ha)']
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        
+        if missing_columns:
+            st.error(f"Missing required columns in data file: {', '.join(missing_columns)}")
+            return
+
+        df.fillna(df.mean(numeric_only=True), inplace=True)
         
         # Display key metrics with custom styling
         st.markdown("""
@@ -434,14 +407,9 @@ def data_analysis_page():
                           color_discrete_sequence=['#2ecc71'])
         st.plotly_chart(fig_models)
 
-        # Add developer section at the bottom
-        render_developer_section()
-
     except Exception as e:
         st.error(f"Error loading data: {str(e)}")
         st.info("Please ensure you have the required data files in the artifacts directory.")
-        # Still show developer section even if there's an error
-        render_developer_section()
 
 
 def prediction_page():
@@ -540,27 +508,49 @@ def prediction_page():
     })
     if st.button('Predict'):
         try:
+            # Check if model files exist
+            if not os.path.exists(MODEL_PATH):
+                st.error("Model file not found. Please ensure model.pkl is present in the artifacts directory.")
+                return
+            if not os.path.exists(PREPROCESSOR_PATH):
+                st.error("Preprocessor file not found. Please ensure preprocessor.pkl is present in the artifacts directory.")
+                return
+
             pred = predict(input_df)
-            st.success(f'Predicted Fertility: {pred[0]}')
-            
-            # Display additional information about the prediction
-            fertility_map = {0: "Low", 1: "Medium", 2: "High"}
-            if pred[0] in fertility_map:
-                st.markdown(f"""
-                ### Detailed Result
-                Fertility Level: **{fertility_map[pred[0]]}**
+            if pred is not None:
+                st.success(f'Predicted Fertility: {pred[0]}')
                 
-                Recommendations:
-                - {"Consider adding more nutrients" if pred[0] == 0 else "Maintain current practices" if pred[0] == 1 else "Soil is highly fertile"}
-                - {"Focus on improving organic matter content" if organic < 2.0 else "Good organic matter content"}
-                - {"Monitor pH levels" if ph < 6.0 or ph > 8.0 else "pH levels are optimal"}
-                """)
+                # Display additional information about the prediction
+                fertility_map = {0: "Low", 1: "Medium", 2: "High"}
+                if pred[0] in fertility_map:
+                    st.markdown(f"""
+                    ### Detailed Result
+                    Fertility Level: **{fertility_map[pred[0]]}**
+                    
+                    Recommendations:
+                    - {"Consider adding more nutrients" if pred[0] == 0 else "Maintain current practices" if pred[0] == 1 else "Soil is highly fertile"}
+                    - {"Focus on improving organic matter content" if organic < 2.0 else "Good organic matter content"}
+                    - {"Monitor pH levels" if ph < 6.0 or ph > 8.0 else "pH levels are optimal"}
+                    """)
+            else:
+                st.error("Could not generate prediction. Please check if all model files are properly loaded.")
         except Exception as e:
-            st.error(f'Error: {e}')
-            st.info("Please make sure all input values are within expected ranges.")
+            st.error(f'Error during prediction: {str(e)}')
+            st.info("Please make sure all input values are within expected ranges and model files are present.")
+
+
+def check_required_files():
+    missing_files = []
+    for file_path in [MODEL_PATH, PREPROCESSOR_PATH, RAW_DATA_PATH]:
+        if not os.path.exists(file_path):
+            missing_files.append(os.path.basename(file_path))
     
-    # Add developer section at the bottom
-    render_developer_section()
+    if missing_files:
+        st.error("⚠️ Missing required files:")
+        st.write(f"The following files are missing from the artifacts directory: {', '.join(missing_files)}")
+        st.info(f"Looking for files in: {os.path.dirname(MODEL_PATH)}")
+        return False
+    return True
 
 def set_custom_style():
     # Add Font Awesome for social icons
@@ -637,6 +627,10 @@ def main():
     
     set_custom_style()
     
+    # Check for required files at startup
+    if not check_required_files():
+        st.stop()
+    
     # Custom sidebar styling
     st.sidebar.markdown("""
         <div style='text-align: center; margin-bottom: 20px;'>
@@ -656,6 +650,28 @@ def main():
         <div style='text-align: center; padding: 20px; background-color: rgba(0, 204, 102, 0.1); border-radius: 10px;'>
             <h4 style='color: #00cc66;'>About</h4>
             <p style='color: white; font-size: 0.9em;'>Advanced ML-powered soil analysis system for precise fertility assessment</p>
+        </div>
+    """, unsafe_allow_html=True)
+    
+    # Developer Information
+    st.sidebar.markdown("---")
+    st.sidebar.markdown("""
+        <div style='text-align: center; padding: 20px; background-color: rgba(0, 204, 102, 0.1); border-radius: 10px;'>
+            <h4 style='color: #00cc66;'>Developer</h4>
+            <img src="https://media.licdn.com/dms/image/D4D35AQE6tc87Sl4wbA/profile-framedphoto-shrink_200_200/0/1688908553166?e=1689512400&v=beta&t=kbHAL45IHfBp_YiPWVutx0hSOtBNBbNGcbNtNm2JBOw" style='width: 100px; border-radius: 50%; margin: 10px auto;'>
+            <p style='color: white; font-weight: bold; margin: 10px 0;'>Vibhuti Sarode</p>
+            <p style='color: #cccccc; font-size: 0.9em; margin: 5px 0;'>Data Science Enthusiast</p>
+            <div style='margin-top: 15px;'>
+                <a href='https://www.linkedin.com/in/vibhuti-sarode-a0b736281?utm_source=share&utm_campaign=share_via&utm_content=profile&utm_medium=android_app' target='_blank' style='color: #00cc66; text-decoration: none; margin: 0 10px;'>
+                    <i class='fab fa-linkedin'></i> LinkedIn
+                </a>
+                <a href='https://github.com/vibhutisarode' target='_blank' style='color: #00cc66; text-decoration: none; margin: 0 10px;'>
+                    <i class='fab fa-github'></i> GitHub
+                </a>
+            </div>
+            <div style='margin-top: 10px; font-size: 0.8em; color: #888888;'>
+                <p>📧 vibhutisarode00@gmail.com</p>
+            </div>
         </div>
     """, unsafe_allow_html=True)
     
