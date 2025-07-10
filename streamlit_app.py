@@ -3,63 +3,42 @@ import pickle
 import numpy as np
 import pandas as pd
 import os
+import sys
 
-# Define base directory and artifact paths
-def get_base_dir():
-    if os.path.exists('/mount/src/datascience'):  # Streamlit Cloud
-        return '/mount/src/datascience'
-    else:  # Local development
-        return os.path.dirname(os.path.abspath(__file__))
+# Add the project root to Python path to ensure imports work correctly
+ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
+if ROOT_DIR not in sys.path:
+    sys.path.append(ROOT_DIR)
 
-BASE_DIR = get_base_dir()
-MODEL_PATH = os.path.join(BASE_DIR, 'artifacts', 'model.pkl')
-PREPROCESSOR_PATH = os.path.join(BASE_DIR, 'artifacts', 'preprocessor.pkl')
-RAW_DATA_PATH = os.path.join(BASE_DIR, 'artifacts', 'raw.csv')
-
-# Print paths for debugging
-st.set_page_config(
-    page_title='Soil Fertility Prediction System',
-    page_icon='🌱',
-    layout='wide',
-    initial_sidebar_state='expanded'
-)
-
-if st.checkbox("Show Debug Info", False):
-    st.write("Current Directory:", os.getcwd())
-    st.write("Base Directory:", BASE_DIR)
-    st.write("Model Path:", MODEL_PATH)
-    st.write("Preprocessor Path:", PREPROCESSOR_PATH)
-    st.write("Raw Data Path:", RAW_DATA_PATH)
-    st.write("Files in artifacts:", os.listdir(os.path.join(BASE_DIR, 'artifacts')) if os.path.exists(os.path.join(BASE_DIR, 'artifacts')) else "artifacts directory not found")
+# Define paths relative to the project root
+MODEL_PATH = os.path.join(ROOT_DIR, 'artifacts', 'model.pkl')
+PREPROCESSOR_PATH = os.path.join(ROOT_DIR, 'artifacts', 'preprocessor.pkl')
 
 # Utility functions
 def load_pickle(path):
-    try:
-        if not os.path.exists(path):
-            st.error(f"File not found: {path}")
-            st.info("Please ensure all required model files are present in the artifacts directory.")
-            return None
-        with open(path, 'rb') as f:
-            return pickle.load(f)
-    except Exception as e:
-        st.error(f"Error loading file {path}: {str(e)}")
-        return None
+    with open(path, 'rb') as f:
+        return pickle.load(f)
 
 def predict(features):
-    model = load_pickle(MODEL_PATH)
-    preprocessor = load_pickle(PREPROCESSOR_PATH)
-    
-    if model is None or preprocessor is None:
-        st.error("Could not load model or preprocessor. Please check if all required files are present.")
-        return None
-    
     try:
+        # Load model and preprocessor
+        if not os.path.exists(MODEL_PATH):
+            raise FileNotFoundError(f"Model file not found at {MODEL_PATH}")
+        if not os.path.exists(PREPROCESSOR_PATH):
+            raise FileNotFoundError(f"Preprocessor file not found at {PREPROCESSOR_PATH}")
+        
+        model = load_pickle(MODEL_PATH)
+        preprocessor = load_pickle(PREPROCESSOR_PATH)
+        
+        # Process features and get prediction
         features_processed = preprocessor.transform(features)
         prediction = model.predict(features_processed)
+        
         return prediction
     except Exception as e:
         st.error(f"Error during prediction: {str(e)}")
-        return None
+        st.info("Please ensure all model artifacts are properly set up in the artifacts directory.")
+        raise e
 
 def home_page():
     # Hero Section
@@ -144,15 +123,15 @@ def home_page():
             <h2 style='color: #00cc66; margin-bottom: 1em;'>Quick Start Guide</h2>
             <div style='display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px;'>
                 <div class='feature-card'>
-                    <h4 style='color: #00cc66; margin-bottom: 10px;'>1. Input Data</h4>
+                    <h4 style='color: #00cc66;'>1. Input Data</h4>
                     <p style='color: #cccccc;'>Enter your soil sample parameters in the prediction page.</p>
                 </div>
                 <div class='feature-card'>
-                    <h4 style='color: #00cc66; margin-bottom: 10px;'>2. Get Prediction</h4>
+                    <h4 style='color: #00cc66;'>2. Get Prediction</h4>
                     <p style='color: #cccccc;'>Receive instant fertility assessment results.</p>
                 </div>
                 <div class='feature-card'>
-                    <h4 style='color: #00cc66; margin-bottom: 10px;'>3. View Analysis</h4>
+                    <h4 style='color: #00cc66;'>3. View Analysis</h4>
                     <p style='color: #cccccc;'>Explore detailed insights and recommendations.</p>
                 </div>
             </div>
@@ -170,25 +149,12 @@ def data_analysis_page():
 
     # Load and prepare data
     try:
-        if not os.path.exists(RAW_DATA_PATH):
-            st.error("Data file not found. Please ensure 'raw.csv' is present in the artifacts directory.")
-            st.info(f"Looking for file at: {RAW_DATA_PATH}")
+        csv_path = os.path.join(ROOT_DIR, 'artifacts', 'raw.csv')
+        if not os.path.exists(csv_path):
+            st.warning("Analysis data file not found. Some visualizations may not be available.")
             return
-
-        df = pd.read_csv(RAW_DATA_PATH)
-        if df.empty:
-            st.error("The data file is empty.")
-            return
-
-        # Check for required columns
-        required_columns = ['pH Level', 'Organic Matter (%)', 'Fertility Status', 'Soil Type',
-                          'Nitrogen Content (kg/ha)', 'Phosphorus Content (kg/ha)', 'Potassium Content (kg/ha)']
-        missing_columns = [col for col in required_columns if col not in df.columns]
-        
-        if missing_columns:
-            st.error(f"Missing required columns in data file: {', '.join(missing_columns)}")
-            return
-
+            
+        df = pd.read_csv(csv_path)
         df.fillna(df.mean(numeric_only=True), inplace=True)
         
         # Display key metrics with custom styling
@@ -483,40 +449,40 @@ def prediction_page():
             help='Amount of potassium in kilograms per hectare')
     
     # Input summary with custom styling
-    st.markdown("""
-        <div style='background: rgba(0, 204, 102, 0.05); padding: 20px; border-radius: 10px; margin-top: 20px;'>
-            <h3 style='color: #00cc66;'>Input Summary</h3>
-            <div style='display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; margin-top: 15px;'>
-                <div>
-                    <h4 style='color: #00cc66; margin-bottom: 10px;'>Location & Soil Type</h4>
-                    <p style='color: #cccccc;'><strong>District:</strong> {}</p>
-                    <p style='color: #cccccc;'><strong>Soil Type:</strong> {}</p>
+        st.markdown("""
+            <div style='background: rgba(0, 204, 102, 0.05); padding: 20px; border-radius: 10px; margin-top: 20px;'>
+                <h3 style='color: #00cc66;'>Input Summary</h3>
+                <div style='display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; margin-top: 15px;'>
+                    <div>
+                        <h4 style='color: #00cc66; margin-bottom: 10px;'>Location & Soil Type</h4>
+                        <p style='color: #cccccc;'><strong>District:</strong> {}</p>
+                        <p style='color: #cccccc;'><strong>Soil Type:</strong> {}</p>
+                    </div>
+                    <div>
+                        <h4 style='color: #00cc66; margin-bottom: 10px;'>Basic Properties</h4>
+                        <p style='color: #cccccc;'><strong>pH Level:</strong> {:.2f}</p>
+                        <p style='color: #cccccc;'><strong>Organic Matter:</strong> {:.1f}%</p>
+                    </div>
                 </div>
-                <div>
-                    <h4 style='color: #00cc66; margin-bottom: 10px;'>Basic Properties</h4>
-                    <p style='color: #cccccc;'><strong>pH Level:</strong> {:.2f}</p>
-                    <p style='color: #cccccc;'><strong>Organic Matter:</strong> {:.1f}%</p>
+                <div style='margin-top: 20px;'>
+                    <h4 style='color: #00cc66; margin-bottom: 10px;'>Nutrient Content</h4>
+                    <div style='display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px;'>
+                        <div>
+                            <p style='color: #cccccc;'><strong>Nitrogen:</strong></p>
+                            <p style='color: #00cc66;'>{:.1f} kg/ha</p>
+                        </div>
+                        <div>
+                            <p style='color: #cccccc;'><strong>Phosphorus:</strong></p>
+                            <p style='color: #00cc66;'>{:.1f} kg/ha</p>
+                        </div>
+                        <div>
+                            <p style='color: #cccccc;'><strong>Potassium:</strong></p>
+                            <p style='color: #00cc66;'>{:.1f} kg/ha</p>
+                        </div>
+                    </div>
                 </div>
             </div>
-            <div style='margin-top: 20px;'>
-                <h4 style='color: #00cc66; margin-bottom: 10px;'>Nutrient Content</h4>
-                <div style='display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px;'>
-                    <div>
-                        <p style='color: #cccccc;'><strong>Nitrogen:</strong></p>
-                        <p style='color: #00cc66;'>{:.1f} kg/ha</p>
-                    </div>
-                    <div>
-                        <p style='color: #cccccc;'><strong>Phosphorus:</strong></p>
-                        <p style='color: #00cc66;'>{:.1f} kg/ha</p>
-                    </div>
-                    <div>
-                        <p style='color: #cccccc;'><strong>Potassium:</strong></p>
-                        <p style='color: #00cc66;'>{:.1f} kg/ha</p>
-                    </div>
-                </div>
-            </div>
-        </div>
-    """.format(district, soil_type, ph, organic, nitrogen, phosphorus, potassium), unsafe_allow_html=True)
+        """.format(district, soil_type, ph, organic, nitrogen, phosphorus, potassium), unsafe_allow_html=True)
     
     # Create DataFrame with proper column names to match the preprocessor
     input_df = pd.DataFrame({
@@ -530,54 +496,28 @@ def prediction_page():
     })
     if st.button('Predict'):
         try:
-            # Check if model files exist
-            if not os.path.exists(MODEL_PATH):
-                st.error("Model file not found. Please ensure model.pkl is present in the artifacts directory.")
-                return
-            if not os.path.exists(PREPROCESSOR_PATH):
-                st.error("Preprocessor file not found. Please ensure preprocessor.pkl is present in the artifacts directory.")
-                return
-
             pred = predict(input_df)
-            if pred is not None:
-                st.success(f'Predicted Fertility: {pred[0]}')
+            st.success(f'Predicted Fertility: {pred[0]}')
+            
+            # Display additional information about the prediction
+            fertility_map = {0: "Low", 1: "Medium", 2: "High"}
+            if pred[0] in fertility_map:
+                st.markdown(f"""
+                ### Detailed Result
+                Fertility Level: **{fertility_map[pred[0]]}**
                 
-                # Display additional information about the prediction
-                fertility_map = {0: "Low", 1: "Medium", 2: "High"}
-                if pred[0] in fertility_map:
-                    st.markdown(f"""
-                    ### Detailed Result
-                    Fertility Level: **{fertility_map[pred[0]]}**
-                    
-                    Recommendations:
-                    - {"Consider adding more nutrients" if pred[0] == 0 else "Maintain current practices" if pred[0] == 1 else "Soil is highly fertile"}
-                    - {"Focus on improving organic matter content" if organic < 2.0 else "Good organic matter content"}
-                    - {"Monitor pH levels" if ph < 6.0 or ph > 8.0 else "pH levels are optimal"}
-                    """)
-            else:
-                st.error("Could not generate prediction. Please check if all model files are properly loaded.")
+                Recommendations:
+                - {"Consider adding more nutrients" if pred[0] == 0 else "Maintain current practices" if pred[0] == 1 else "Soil is highly fertile"}
+                - {"Focus on improving organic matter content" if organic < 2.0 else "Good organic matter content"}
+                - {"Monitor pH levels" if ph < 6.0 or ph > 8.0 else "pH levels are optimal"}
+                """)
         except Exception as e:
-            st.error(f'Error during prediction: {str(e)}')
-            st.info("Please make sure all input values are within expected ranges and model files are present.")
+            st.error(f'Error: {e}')
+            st.info("Please make sure all input values are within expected ranges.")
 
-
-def check_required_files():
-    missing_files = []
-    for file_path in [MODEL_PATH, PREPROCESSOR_PATH, RAW_DATA_PATH]:
-        if not os.path.exists(file_path):
-            missing_files.append(os.path.basename(file_path))
-    
-    if missing_files:
-        st.error("⚠️ Missing required files:")
-        st.write(f"The following files are missing from the artifacts directory: {', '.join(missing_files)}")
-        st.info(f"Looking for files in: {os.path.dirname(MODEL_PATH)}")
-        return False
-    return True
 
 def set_custom_style():
-    # Add Font Awesome for social icons
     st.markdown("""
-        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
         <style>
         .main {
             background-color: #0e1117;
@@ -649,10 +589,6 @@ def main():
     
     set_custom_style()
     
-    # Check for required files at startup
-    if not check_required_files():
-        st.stop()
-    
     # Custom sidebar styling
     st.sidebar.markdown("""
         <div style='text-align: center; margin-bottom: 20px;'>
@@ -672,28 +608,6 @@ def main():
         <div style='text-align: center; padding: 20px; background-color: rgba(0, 204, 102, 0.1); border-radius: 10px;'>
             <h4 style='color: #00cc66;'>About</h4>
             <p style='color: white; font-size: 0.9em;'>Advanced ML-powered soil analysis system for precise fertility assessment</p>
-        </div>
-    """, unsafe_allow_html=True)
-    
-    # Developer Information
-    st.sidebar.markdown("---")
-    st.sidebar.markdown("""
-        <div style='text-align: center; padding: 20px; background-color: rgba(0, 204, 102, 0.1); border-radius: 10px;'>
-            <h4 style='color: #00cc66;'>Developer</h4>
-            <img src="https://media.licdn.com/dms/image/D4D35AQE6tc87Sl4wbA/profile-framedphoto-shrink_200_200/0/1688908553166?e=1689512400&v=beta&t=kbHAL45IHfBp_YiPWVutx0hSOtBNBbNGcbNtNm2JBOw" style='width: 100px; border-radius: 50%; margin: 10px auto;'>
-            <p style='color: white; font-weight: bold; margin: 10px 0;'>Vibhuti Sarode</p>
-            <p style='color: #cccccc; font-size: 0.9em; margin: 5px 0;'>Data Science Enthusiast</p>
-            <div style='margin-top: 15px;'>
-                <a href='https://www.linkedin.com/in/vibhuti-sarode-a0b736281?utm_source=share&utm_campaign=share_via&utm_content=profile&utm_medium=android_app' target='_blank' style='color: #00cc66; text-decoration: none; margin: 0 10px;'>
-                    <i class='fab fa-linkedin'></i> LinkedIn
-                </a>
-                <a href='https://github.com/vibhutisarode' target='_blank' style='color: #00cc66; text-decoration: none; margin: 0 10px;'>
-                    <i class='fab fa-github'></i> GitHub
-                </a>
-            </div>
-            <div style='margin-top: 10px; font-size: 0.8em; color: #888888;'>
-                <p>📧 vibhutisarode00@gmail.com</p>
-            </div>
         </div>
     """, unsafe_allow_html=True)
     
