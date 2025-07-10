@@ -18,6 +18,27 @@ def predict(features):
     prediction = model.predict(features_processed)
     return prediction
 
+def render_developer_section():
+    st.markdown("---")  # Add a divider
+    st.markdown("""
+        <div style='text-align: center; padding: 20px; background-color: rgba(0, 204, 102, 0.1); border-radius: 10px; margin-top: 30px;'>
+            <h4 style='color: #00cc66;'>Developer</h4>
+            <p style='color: white; font-weight: bold; margin: 15px 0; font-size: 1.2em;'>Vibhuti Sarode</p>
+            <p style='color: #cccccc; font-size: 0.9em; margin: 10px 0;'>Data Science Enthusiast</p>
+            <div style='margin-top: 20px;'>
+                <a href='https://www.linkedin.com/in/vibhuti-sarode-a0b736281?utm_source=share&utm_campaign=share_via&utm_content=profile&utm_medium=android_app' target='_blank' style='color: #00cc66; text-decoration: none; margin: 0 10px;'>
+                    <i class='fab fa-linkedin'></i> LinkedIn
+                </a>
+                <a href='https://github.com/vibhutisarode' target='_blank' style='color: #00cc66; text-decoration: none; margin: 0 10px;'>
+                    <i class='fab fa-github'></i> GitHub
+                </a>
+            </div>
+            <div style='margin-top: 10px; font-size: 0.8em; color: #888888;'>
+                <p>📧 vibhutisarode00@gmail.com</p>
+            </div>
+        </div>
+    """, unsafe_allow_html=True)
+
 def home_page():
     # Hero Section
     st.markdown("""
@@ -115,6 +136,9 @@ def home_page():
             </div>
         </div>
     """, unsafe_allow_html=True)
+
+    # Add developer section at the bottom
+    render_developer_section()
 
 
 def data_analysis_page():
@@ -368,9 +392,14 @@ def data_analysis_page():
                           color_discrete_sequence=['#2ecc71'])
         st.plotly_chart(fig_models)
 
+        # Add developer section at the bottom
+        render_developer_section()
+
     except Exception as e:
         st.error(f"Error loading data: {str(e)}")
         st.info("Please ensure you have the required data files in the artifacts directory.")
+        # Still show developer section even if there's an error
+        render_developer_section()
 
 
 def prediction_page():
@@ -487,10 +516,14 @@ def prediction_page():
         except Exception as e:
             st.error(f'Error: {e}')
             st.info("Please make sure all input values are within expected ranges.")
-
+    
+    # Add developer section at the bottom
+    render_developer_section()
 
 def set_custom_style():
+    # Add Font Awesome for social icons
     st.markdown("""
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
         <style>
         .main {
             background-color: #0e1117;
