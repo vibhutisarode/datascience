@@ -3,20 +3,44 @@ import pickle
 import numpy as np
 import pandas as pd
 import os
+from pathlib import Path
 
-MODEL_PATH = os.path.join('artifacts', 'model.pkl')
-PREPROCESSOR_PATH = os.path.join('artifacts', 'preprocessor.pkl')
-# Utility functions
+# Get the absolute path to the project directory
+BASE_DIR = Path(__file__).parent.absolute()
+
+# Update paths to use absolute paths
+MODEL_PATH = os.path.join(BASE_DIR, 'artifacts', 'model.pkl')
+PREPROCESSOR_PATH = os.path.join(BASE_DIR, 'artifacts', 'preprocessor.pkl')
+DATA_PATH = os.path.join(BASE_DIR, 'artifacts', 'raw.csv')
+
+# Utility functions with error handling
 def load_pickle(path):
-    with open(path, 'rb') as f:
-        return pickle.load(f)
+    try:
+        with open(path, 'rb') as f:
+            return pickle.load(f)
+    except Exception as e:
+        st.error(f"Error loading model file: {str(e)}")
+        return None
+
+def load_data():
+    try:
+        return pd.read_csv(DATA_PATH)
+    except Exception as e:
+        st.error(f"Error loading data file: {str(e)}")
+        return None
 
 def predict(features):
     model = load_pickle(MODEL_PATH)
     preprocessor = load_pickle(PREPROCESSOR_PATH)
-    features_processed = preprocessor.transform(features)
-    prediction = model.predict(features_processed)
-    return prediction
+    if model is None or preprocessor is None:
+        return None
+    try:
+        features_processed = preprocessor.transform(features)
+        prediction = model.predict(features_processed)
+        return prediction
+    except Exception as e:
+        st.error(f"Error during prediction: {str(e)}")
+        return None
 
 def render_developer_section():
     st.markdown("---")  # Add a divider
@@ -151,8 +175,12 @@ def data_analysis_page():
 
     # Load and prepare data
     try:
-        df = pd.read_csv('artifacts/raw.csv')
-        df.fillna(df.mean(numeric_only=True), inplace=True)
+        df = load_data()
+        if df is not None:
+            df.fillna(df.mean(numeric_only=True), inplace=True)
+        else:
+            st.error("Could not load the data file. Please check if the file exists in the artifacts directory.")
+            return
         
         # Display key metrics with custom styling
         st.markdown("""
