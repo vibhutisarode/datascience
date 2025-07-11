@@ -120,7 +120,7 @@ class ModelTrainer:
             mlflow.set_registry_uri("https://dagshub.com/vibhutisarode/datascience.mlflow")
             tracking_url_type_store = urlparse(mlflow.get_tracking_uri()).scheme
 
-            # mlflow
+            # mlflow - Using basic logging compatible with DagsHub
 
             with mlflow.start_run():
 
@@ -128,23 +128,34 @@ class ModelTrainer:
 
                 (rmse, mae, r2) = self.eval_metrics(y_test, predicted_qualities)
 
+                # Log model name and parameters
+                mlflow.log_param("model_name", best_model_name)
                 mlflow.log_params(best_params)
 
                 mlflow.log_metric("rmse", rmse)
                 mlflow.log_metric("r2", r2)
                 mlflow.log_metric("mae", mae)
 
-
-                # Model registry does not work with file store
-                if tracking_url_type_store != "file":
-
-                    # Register the model
-                    # There are other ways to use the Model Registry, which depends on the use case,
-                    # please refer to the doc for more information:
-                    # https://mlflow.org/docs/latest/model-registry.html#api-workflow
-                    mlflow.sklearn.log_model(best_model, "model", registered_model_name=actual_model)
-                else:
-                    mlflow.sklearn.log_model(best_model, "model")
+                # Use basic model logging without advanced features
+                try:
+                    # Try to log model artifacts (pickled model)
+                    import pickle
+                    import tempfile
+                    
+                    # Create a temporary file to save the model
+                    with tempfile.NamedTemporaryFile(mode='wb', delete=False, suffix='.pkl') as f:
+                        pickle.dump(best_model, f)
+                        temp_model_path = f.name
+                    
+                    # Log the model file as an artifact
+                    mlflow.log_artifact(temp_model_path, "model")
+                    
+                    # Clean up temporary file
+                    os.unlink(temp_model_path)
+                    
+                except Exception as mlflow_error:
+                    logging.warning(f"MLflow model logging failed: {mlflow_error}")
+                    # Continue execution even if MLflow logging fails
 
 
 

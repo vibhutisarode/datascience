@@ -13,4 +13,5 @@ seaborn
 scikit-learn
 catboost
 mlflow
+flask
 
