@@ -3,16 +3,11 @@ import pickle
 import numpy as np
 import pandas as pd
 import os
-import sys
+import plotly.express as px
+import plotly.graph_objects as go
 
-# Add the project root to Python path to ensure imports work correctly
-ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
-if ROOT_DIR not in sys.path:
-    sys.path.append(ROOT_DIR)
-
-# Define paths relative to the project root
-MODEL_PATH = os.path.join(ROOT_DIR, 'artifacts', 'model.pkl')
-PREPROCESSOR_PATH = os.path.join(ROOT_DIR, 'artifacts', 'preprocessor.pkl')
+MODEL_PATH = os.path.join('artifacts', 'model.pkl')
+PREPROCESSOR_PATH = os.path.join('artifacts', 'preprocessor.pkl')
 
 # Utility functions
 def load_pickle(path):
@@ -20,25 +15,11 @@ def load_pickle(path):
         return pickle.load(f)
 
 def predict(features):
-    try:
-        # Load model and preprocessor
-        if not os.path.exists(MODEL_PATH):
-            raise FileNotFoundError(f"Model file not found at {MODEL_PATH}")
-        if not os.path.exists(PREPROCESSOR_PATH):
-            raise FileNotFoundError(f"Preprocessor file not found at {PREPROCESSOR_PATH}")
-        
-        model = load_pickle(MODEL_PATH)
-        preprocessor = load_pickle(PREPROCESSOR_PATH)
-        
-        # Process features and get prediction
-        features_processed = preprocessor.transform(features)
-        prediction = model.predict(features_processed)
-        
-        return prediction
-    except Exception as e:
-        st.error(f"Error during prediction: {str(e)}")
-        st.info("Please ensure all model artifacts are properly set up in the artifacts directory.")
-        raise e
+    model = load_pickle(MODEL_PATH)
+    preprocessor = load_pickle(PREPROCESSOR_PATH)
+    features_processed = preprocessor.transform(features)
+    prediction = model.predict(features_processed)
+    return prediction
 
 def home_page():
     # Hero Section
@@ -140,226 +121,130 @@ def home_page():
 
 
 def data_analysis_page():
-    st.markdown("""
-        <div style='text-align: center; padding: 1em;'>
-            <h1 style='color: #00cc66; margin-bottom: 0.5em;'>📊 Soil Analysis Dashboard</h1>
-            <p style='color: #cccccc; font-size: 1.1em;'>Comprehensive analysis of soil samples and fertility patterns</p>
-        </div>
-    """, unsafe_allow_html=True)
+    st.markdown("<h1 style='text-align: center;'>🌱 Soil Fertility Prediction System</h1>", unsafe_allow_html=True)
+    st.markdown("<h2>📈 Data Analysis Dashboard</h2>", unsafe_allow_html=True)
 
     # Load and prepare data
     try:
-        csv_path = os.path.join(ROOT_DIR, 'artifacts', 'raw.csv')
-        if not os.path.exists(csv_path):
-            st.warning("Analysis data file not found. Some visualizations may not be available.")
-            return
-            
-        df = pd.read_csv(csv_path)
-        df.fillna(df.mean(numeric_only=True), inplace=True)
-        
-        # Display key metrics with custom styling
-        st.markdown("""
-            <div style='background: rgba(0, 204, 102, 0.05); padding: 20px; border-radius: 15px; margin-bottom: 30px;'>
-                <h3 style='color: #00cc66; margin-bottom: 20px; text-align: center;'>Key Metrics Overview</h3>
-            </div>
-        """, unsafe_allow_html=True)
-        
-        col1, col2, col3, col4 = st.columns(4)
-        
-        # Custom metric display
-        total_samples = len(df)
-        avg_ph = df['pH Level'].mean()
-        avg_organic = df['Organic Matter (%)'].mean()
-        fertility_counts = df['Fertility Status'].value_counts()
-        high_fertility = int(fertility_counts.get(2, 0))
-        
-        metrics_data = [
-            {"title": "Total Samples", "value": f"{total_samples:,}", "icon": "📊", "delta": f"{total_samples/1000:.1f}k samples"},
-            {"title": "Average pH", "value": f"{avg_ph:.2f}", "icon": "🧪", "delta": "Neutral" if 6.5 <= avg_ph <= 7.5 else "Acidic" if avg_ph < 6.5 else "Alkaline"},
-            {"title": "Organic Matter", "value": f"{avg_organic:.1f}%", "icon": "🍃", "delta": "Good" if avg_organic > 2 else "Needs Improvement"},
-            {"title": "High Fertility", "value": f"{high_fertility:,}", "icon": "⭐", "delta": f"{(high_fertility/total_samples)*100:.1f}% of total"}
+        # Try multiple possible locations for the data file
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        possible_paths = [
+            os.path.join(current_dir, 'artifacts', 'raw.csv'),
+            os.path.join(current_dir, 'notebook', 'data', 'raw.csv'),
+            os.path.join(current_dir, 'notebook', 'cleaned_soil_analysis_data(1).csv')
         ]
         
-        cols = [col1, col2, col3, col4]
-        for col, metric in zip(cols, metrics_data):
-            col.markdown(f"""
-                <div style='background: rgba(0, 204, 102, 0.1); padding: 15px; border-radius: 10px; text-align: center;'>
-                    <div style='font-size: 24px; margin-bottom: 5px;'>{metric['icon']}</div>
-                    <div style='color: #cccccc; font-size: 0.9em;'>{metric['title']}</div>
-                    <div style='color: #00cc66; font-size: 1.8em; font-weight: bold; margin: 10px 0;'>{metric['value']}</div>
-                    <div style='color: #888888; font-size: 0.8em;'>{metric['delta']}</div>
-                </div>
-            """, unsafe_allow_html=True)
+        df = None
+        for path in possible_paths:
+            try:
+                df = pd.read_csv(path)
+                st.success(f"Successfully loaded data from {path}")
+                break
+            except FileNotFoundError:
+                continue
+        
+        if df is None:
+            raise FileNotFoundError("Could not find the data file in any of the expected locations")
+            
+        df.fillna(df.mean(numeric_only=True), inplace=True)
+        
+        # Display key metrics
+        col1, col2, col3, col4 = st.columns(4)
+        col1.metric("Total Samples", len(df))
+        col2.metric("Avg pH Level", f"{df['pH Level'].mean():.2f}")
+        col3.metric("Avg Organic Matter", f"{df['Organic Matter (%)'].mean():.1f}%")
+        
+        # Calculate fertility distribution
+        fertility_counts = df['Fertility Status'].value_counts()
+        col4.metric("High Fertility Samples", int(fertility_counts.get(2, 0)))
         
         # Correlation Analysis
-        st.markdown("""
-            <div style='background: rgba(0, 204, 102, 0.05); padding: 20px; border-radius: 15px; margin: 30px 0;'>
-                <h3 style='color: #00cc66; margin-bottom: 20px;'>� Parameter Correlations</h3>
-                <p style='color: #cccccc;'>Discover relationships between different soil parameters</p>
-            </div>
-        """, unsafe_allow_html=True)
-        
+        st.markdown("### 📊 Feature Correlations")
         corr_cols = ['pH Level', 'Organic Matter (%)', 'Nitrogen Content (kg/ha)',
                     'Phosphorus Content (kg/ha)', 'Potassium Content (kg/ha)']
         corr = df[corr_cols].corr()
         
-        # Create an enhanced heatmap using plotly
+        # Create a heatmap using plotly
         import plotly.express as px
-        import plotly.graph_objects as go
-        
-        fig = go.Figure(data=go.Heatmap(
-            z=corr,
-            x=corr_cols,
-            y=corr_cols,
-            colorscale='RdBu',
-            zmin=-1, zmax=1,
-            text=np.round(corr, 2),
-            texttemplate='%{text}',
-            textfont={"size": 10},
-            hoverongaps=False))
-        
-        fig.update_layout(
-            title={
-                'text': 'Soil Parameter Correlations',
-                'y':0.95,
-                'x':0.5,
-                'xanchor': 'center',
-                'yanchor': 'top',
-                'font': dict(size=20, color='#00cc66')
-            },
-            plot_bgcolor='rgba(0,0,0,0)',
-            paper_bgcolor='rgba(0,0,0,0)',
-            font=dict(color='#cccccc'),
-            height=600
-        )
-        st.plotly_chart(fig, use_container_width=True)
+        fig = px.imshow(corr,
+                       labels=dict(color="Correlation"),
+                       x=corr_cols,
+                       y=corr_cols,
+                       color_continuous_scale='RdBu')
+        st.plotly_chart(fig)
 
         # Soil Parameters Distribution
-        st.markdown("""
-            <div style='background: rgba(0, 204, 102, 0.05); padding: 20px; border-radius: 15px; margin: 30px 0;'>
-                <h3 style='color: #00cc66; margin-bottom: 20px;'>📊 Parameter Distributions</h3>
-                <p style='color: #cccccc;'>Analysis of key soil parameters across different samples</p>
-            </div>
-        """, unsafe_allow_html=True)
-        
+        st.markdown("### 🌍 Soil Parameters Distribution")
         col1, col2 = st.columns(2)
         
         with col1:
-            # Enhanced pH Level Distribution
-            fig_ph = go.Figure()
-            fig_ph.add_trace(go.Histogram(
-                x=df['pH Level'],
-                nbinsx=30,
-                marker_color='rgba(0, 204, 102, 0.6)',
-                name='pH Distribution'
-            ))
-            fig_ph.add_vline(x=7, line_dash="dash", line_color="#cccccc",
-                           annotation_text="Neutral pH (7.0)", 
-                           annotation_font_color="#cccccc")
+            # pH Level Distribution
+            fig_ph = px.histogram(df, x='pH Level', 
+                                title='pH Level Distribution',
+                                color_discrete_sequence=['#3366cc'])
+            fig_ph.update_layout(showlegend=False)
+            st.plotly_chart(fig_ph)
             
-            fig_ph.update_layout(
-                title={
-                    'text': 'pH Level Distribution',
-                    'y':0.95,
-                    'x':0.5,
-                    'xanchor': 'center',
-                    'yanchor': 'top',
-                    'font': dict(size=16, color='#00cc66')
-                },
-                plot_bgcolor='rgba(0,0,0,0)',
-                paper_bgcolor='rgba(0,0,0,0)',
-                font=dict(color='#cccccc'),
-                xaxis_title="pH Level",
-                yaxis_title="Number of Samples",
-                hoverlabel=dict(bgcolor='#1a1a1a'),
-                bargap=0.1
-            )
-            st.plotly_chart(fig_ph, use_container_width=True)
-            
-            # Enhanced Soil Type Distribution
+            # Soil Type Distribution
             soil_type_counts = df['Soil Type'].value_counts()
-            colors = px.colors.qualitative.Set3
-            fig_soil = go.Figure(data=[go.Pie(
-                labels=soil_type_counts.index,
-                values=soil_type_counts.values,
-                hole=.3,
-                marker=dict(colors=colors),
-                textinfo='label+percent',
-                hovertemplate="<b>%{label}</b><br>" +
-                            "Samples: %{value}<br>" +
-                            "Percentage: %{percent}<extra></extra>"
-            )])
-            
-            fig_soil.update_layout(
-                title={
-                    'text': 'Soil Type Distribution',
-                    'y':0.95,
-                    'x':0.5,
-                    'xanchor': 'center',
-                    'yanchor': 'top',
-                    'font': dict(size=16, color='#00cc66')
-                },
-                plot_bgcolor='rgba(0,0,0,0)',
-                paper_bgcolor='rgba(0,0,0,0)',
-                font=dict(color='#cccccc'),
-                showlegend=False
-            )
-            st.plotly_chart(fig_soil, use_container_width=True)
+            fig_soil = px.pie(values=soil_type_counts.values, 
+                            names=soil_type_counts.index,
+                            title='Soil Type Distribution')
+            st.plotly_chart(fig_soil)
 
         with col2:
-            # Enhanced Organic Matter Distribution
-            fig_om = go.Figure()
-            fig_om.add_trace(go.Histogram(
-                x=df['Organic Matter (%)'],
-                nbinsx=30,
-                marker_color='rgba(220, 57, 18, 0.6)',
-                name='Organic Matter'
-            ))
+            # Organic Matter Distribution
+            fig_om = px.histogram(df, x='Organic Matter (%)',
+                                title='Organic Matter Distribution',
+                                color_discrete_sequence=['#dc3912'])
+            fig_om.update_layout(showlegend=False)
+            st.plotly_chart(fig_om)
             
-            # Add reference line for good organic matter content
-            fig_om.add_vline(x=2, line_dash="dash", line_color="#cccccc",
-                           annotation_text="Target Level (2%)", 
-                           annotation_font_color="#cccccc")
-            
-            fig_om.update_layout(
-                title={
-                    'text': 'Organic Matter Distribution',
-                    'y':0.95,
-                    'x':0.5,
-                    'xanchor': 'center',
-                    'yanchor': 'top',
-                    'font': dict(size=16, color='#00cc66')
-                },
-                plot_bgcolor='rgba(0,0,0,0)',
-                paper_bgcolor='rgba(0,0,0,0)',
-                font=dict(color='#cccccc'),
-                xaxis_title="Organic Matter (%)",
-                yaxis_title="Number of Samples",
-                hoverlabel=dict(bgcolor='#1a1a1a'),
-                bargap=0.1
-            )
-            st.plotly_chart(fig_om, use_container_width=True)
-            
-            # Enhanced Fertility Status Distribution
+            # Fertility Status Distribution
             fertility_map = {0: "Can Be Improved", 1: "Non-Fertile", 2: "Fertile"}
             df['Fertility Label'] = df['Fertility Status'].map(fertility_map)
             fertility_counts = df['Fertility Label'].value_counts()
+            fig_fertility = px.pie(values=fertility_counts.values,
+                                names=fertility_counts.index,
+                                title='Fertility Status Distribution',
+                                color_discrete_sequence=px.colors.qualitative.Set3)
+            st.plotly_chart(fig_fertility)
+
+        # Nutrient Content Analysis
+        st.markdown("""
+            <div style='background: rgba(0, 204, 102, 0.05); padding: 20px; border-radius: 10px; margin-bottom: 20px;'>
+                <h3 style='color: #00cc66;'>🌱 Nutrient Content Analysis</h3>
+                <p style='color: #cccccc;'>Comprehensive analysis of NPK (Nitrogen, Phosphorus, Potassium) levels across different soil types</p>
+            </div>
+        """, unsafe_allow_html=True)
+
+        col1, col2 = st.columns(2)
+
+        with col1:
+            # NPK Distribution Violin Plot
+            nutrients = ['Nitrogen Content (kg/ha)', 'Phosphorus Content (kg/ha)', 'Potassium Content (kg/ha)']
+            npk_data = pd.melt(df[nutrients], var_name='Nutrient', value_name='Content')
             
-            custom_colors = ['#FFA07A', '#FA8072', '#90EE90']  # Light colors for each category
-            fig_fertility = go.Figure(data=[go.Pie(
-                labels=fertility_counts.index,
-                values=fertility_counts.values,
-                hole=.3,
-                marker=dict(colors=custom_colors),
-                textinfo='label+percent',
-                hovertemplate="<b>%{label}</b><br>" +
-                            "Samples: %{value}<br>" +
-                            "Percentage: %{percent}<extra></extra>"
-            )])
+            fig_violin = go.Figure()
+            colors = ['rgba(0, 204, 102, 0.6)', 'rgba(51, 102, 204, 0.6)', 'rgba(255, 153, 51, 0.6)']
             
-            fig_fertility.update_layout(
+            for nutrient, color in zip(nutrients, colors):
+                fig_violin.add_trace(go.Violin(
+                    x=[nutrient.split()[0]] * len(df),  # Just use "Nitrogen", "Phosphorus", "Potassium"
+                    y=df[nutrient],
+                    name=nutrient.split()[0],
+                    box_visible=True,
+                    meanline_visible=True,
+                    fillcolor=color,
+                    line_color='rgba(0,0,0,0)',
+                    points='all',
+                    pointpos=-0.5,
+                    jitter=0.3
+                ))
+
+            fig_violin.update_layout(
                 title={
-                    'text': 'Fertility Status Distribution',
+                    'text': 'NPK Distribution Overview',
                     'y':0.95,
                     'x':0.5,
                     'xanchor': 'center',
@@ -369,19 +254,104 @@ def data_analysis_page():
                 plot_bgcolor='rgba(0,0,0,0)',
                 paper_bgcolor='rgba(0,0,0,0)',
                 font=dict(color='#cccccc'),
-                showlegend=False
+                xaxis_title="Nutrient Type",
+                yaxis_title="Content (kg/ha)",
+                showlegend=False,
+                height=500
             )
-            st.plotly_chart(fig_fertility, use_container_width=True)
+            st.plotly_chart(fig_violin, use_container_width=True)
 
-        # Nutrient Content Analysis
-        st.markdown("### 🌱 Nutrient Content Analysis")
-        nutrients = ['Nitrogen Content (kg/ha)', 'Phosphorus Content (kg/ha)', 'Potassium Content (kg/ha)']
+        with col2:
+            # Radar Chart for Average Nutrient Content by Soil Type
+            soil_types = df['Soil Type'].unique()
+            nutrient_means = df.groupby('Soil Type')[nutrients].mean()
+
+            fig_radar = go.Figure()
+            colors = px.colors.qualitative.Set3
+
+            for i, soil in enumerate(soil_types):
+                fig_radar.add_trace(go.Scatterpolar(
+                    r=nutrient_means.loc[soil],
+                    theta=['N', 'P', 'K'],
+                    name=soil,
+                    fillcolor=colors[i],
+                    fill='toself',
+                    line=dict(color=colors[i])
+                ))
+
+            fig_radar.update_layout(
+                title={
+                    'text': 'Average NPK by Soil Type',
+                    'y':0.95,
+                    'x':0.5,
+                    'xanchor': 'center',
+                    'yanchor': 'top',
+                    'font': dict(size=16, color='#00cc66')
+                },
+                polar=dict(
+                    radialaxis=dict(
+                        visible=True,
+                        gridcolor='rgba(255,255,255,0.2)'
+                    ),
+                    angularaxis=dict(
+                        gridcolor='rgba(255,255,255,0.2)'
+                    ),
+                    bgcolor='rgba(0,0,0,0)'
+                ),
+                plot_bgcolor='rgba(0,0,0,0)',
+                paper_bgcolor='rgba(0,0,0,0)',
+                font=dict(color='#cccccc'),
+                showlegend=True,
+                legend=dict(
+                    yanchor="top",
+                    y=0.9,
+                    xanchor="left",
+                    x=1.1,
+                    font=dict(color='#cccccc')
+                ),
+                height=500
+            )
+            st.plotly_chart(fig_radar, use_container_width=True)
+
+        # Add NPK Level Summary Table
+        st.markdown("""
+            <div style='background: rgba(0, 204, 102, 0.05); padding: 20px; border-radius: 10px; margin-top: 20px;'>
+                <h4 style='color: #00cc66;'>Nutrient Levels Summary</h4>
+            </div>
+        """, unsafe_allow_html=True)
+
+        # Calculate summary statistics
+        summary_data = {
+            'Metric': ['Average (kg/ha)', 'Minimum (kg/ha)', 'Maximum (kg/ha)', 'Std Dev'],
+            'Nitrogen': [
+                f"{df['Nitrogen Content (kg/ha)'].mean():.1f}",
+                f"{df['Nitrogen Content (kg/ha)'].min():.1f}",
+                f"{df['Nitrogen Content (kg/ha)'].max():.1f}",
+                f"{df['Nitrogen Content (kg/ha)'].std():.1f}"
+            ],
+            'Phosphorus': [
+                f"{df['Phosphorus Content (kg/ha)'].mean():.1f}",
+                f"{df['Phosphorus Content (kg/ha)'].min():.1f}",
+                f"{df['Phosphorus Content (kg/ha)'].max():.1f}",
+                f"{df['Phosphorus Content (kg/ha)'].std():.1f}"
+            ],
+            'Potassium': [
+                f"{df['Potassium Content (kg/ha)'].mean():.1f}",
+                f"{df['Potassium Content (kg/ha)'].min():.1f}",
+                f"{df['Potassium Content (kg/ha)'].max():.1f}",
+                f"{df['Potassium Content (kg/ha)'].std():.1f}"
+            ]
+        }
         
-        # Create box plots for nutrients by soil type
-        fig_nutrients = px.box(df, x='Soil Type', y=nutrients,
-                             title='Nutrient Distribution by Soil Type',
-                             points="all")
-        st.plotly_chart(fig_nutrients)
+        summary_df = pd.DataFrame(summary_data)
+        st.dataframe(
+            summary_df.style.set_properties(**{
+                'background-color': 'rgba(0, 204, 102, 0.05)',
+                'color': '#cccccc'
+            }),
+            hide_index=True,
+            use_container_width=True
+        )
 
         # Model Performance
         st.markdown("### 🤖 Model Performance")
@@ -412,43 +382,62 @@ def prediction_page():
     districts = ['Ahmednagar', 'Pune', 'Nashik', 'Nagpur']
     soil_types = ['Alluvial', 'Red', 'Black', 'Clayey', 'Sandy']
     
-    st.markdown("""
-        <div style='background: rgba(0, 204, 102, 0.05); padding: 20px; border-radius: 10px; margin-bottom: 20px;'>
-            <h3 style='color: #00cc66;'>Soil Parameters</h3>
-            <p style='color: #cccccc;'>Fill in the details below for your soil sample</p>
-        </div>
-    """, unsafe_allow_html=True)
-
-    col1, col2 = st.columns(2)
-    with col1:
-        district = st.selectbox('🏢 District', districts,
-            help='Select the district where the soil sample was collected')
-        
-        soil_type = st.selectbox('🌍 Soil Type', soil_types,
-            help='Select the type of soil being analyzed')
-        
-        ph = st.number_input('🧪 pH Level', 
-            min_value=0.0, max_value=14.0, value=7.0,
-            help='Soil pH level (0-14)')
-            
-        organic = st.number_input('🍃 Organic Matter (%)', 
-            min_value=0.0, max_value=10.0, value=2.5,
-            help='Percentage of organic matter in soil')
+    # Create tabs for different input methods
+    tab1, tab2 = st.tabs(["📝 Manual Input", "📁 Bulk Upload"])
     
-    with col2:
-        nitrogen = st.number_input('🌿 Nitrogen Content (kg/ha)', 
-            min_value=0.0, value=100.0,
-            help='Amount of nitrogen in kilograms per hectare')
+    with tab1:
+        st.markdown("""
+            <div style='background: rgba(0, 204, 102, 0.05); padding: 20px; border-radius: 10px; margin-bottom: 20px;'>
+                <h3 style='color: #00cc66;'>Soil Parameters</h3>
+                <p style='color: #cccccc;'>Fill in the details below for your soil sample</p>
+            </div>
+        """, unsafe_allow_html=True)
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            district = st.selectbox('🏢 District', districts,
+                help='Select the district where the soil sample was collected')
             
-        phosphorus = st.number_input('💠 Phosphorus Content (kg/ha)', 
-            min_value=0.0, value=50.0,
-            help='Amount of phosphorus in kilograms per hectare')
+            soil_type = st.selectbox('🌍 Soil Type', soil_types,
+                help='Select the type of soil being analyzed')
             
-        potassium = st.number_input('🔷 Potassium Content (kg/ha)', 
-            min_value=0.0, value=150.0,
-            help='Amount of potassium in kilograms per hectare')
+            ph = st.number_input('🧪 pH Level', 
+                min_value=0.0, max_value=14.0, value=7.0,
+                help='Soil pH level (0-14)')
+                
+            organic = st.number_input('🍃 Organic Matter (%)', 
+                min_value=0.0, max_value=10.0, value=2.5,
+                help='Percentage of organic matter in soil')
+        
+        with col2:
+            nitrogen = st.number_input('🌿 Nitrogen Content (kg/ha)', 
+                min_value=0.0, value=100.0,
+                help='Amount of nitrogen in kilograms per hectare')
+                
+            phosphorus = st.number_input('💠 Phosphorus Content (kg/ha)', 
+                min_value=0.0, value=50.0,
+                help='Amount of phosphorus in kilograms per hectare')
+                
+            potassium = st.number_input('🔷 Potassium Content (kg/ha)', 
+                min_value=0.0, value=150.0,
+                help='Amount of potassium in kilograms per hectare')
+    
+    with tab2:
+        st.markdown("""
+            <div style='background: rgba(0, 204, 102, 0.05); padding: 20px; border-radius: 10px; margin-bottom: 20px;'>
+                <h3 style='color: #00cc66;'>Bulk Prediction</h3>
+                <p style='color: #cccccc;'>Upload a CSV file with multiple soil samples</p>
+            </div>
+        """, unsafe_allow_html=True)
+        
+        uploaded_file = st.file_uploader("Choose a CSV file", type="csv")
+        if uploaded_file is not None:
+            st.info("File uploaded successfully! You can preview the data below.")
+            df_upload = pd.read_csv(uploaded_file)
+            st.dataframe(df_upload.head())
     
     # Input summary with custom styling
+    with tab1:
         st.markdown("""
             <div style='background: rgba(0, 204, 102, 0.05); padding: 20px; border-radius: 10px; margin-top: 20px;'>
                 <h3 style='color: #00cc66;'>Input Summary</h3>
