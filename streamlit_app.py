@@ -6,20 +6,35 @@ import os
 import plotly.express as px
 import plotly.graph_objects as go
 
-MODEL_PATH = os.path.join('artifacts', 'model.pkl')
-PREPROCESSOR_PATH = os.path.join('artifacts', 'preprocessor.pkl')
+# Import the model utilities
+from src.ENDTOENDDSPROJECT.models.model_data import get_model_and_preprocessor, load_model_from_b64
 
-# Utility functions
-def load_pickle(path):
-    with open(path, 'rb') as f:
-        return pickle.load(f)
+# Get the model and preprocessor data
+model_b64, preprocessor_b64 = get_model_and_preprocessor()
+
+@st.cache_resource
+def load_model():
+    if model_b64 is None or preprocessor_b64 is None:
+        st.error("Error: Could not load the model. Please ensure model files are properly saved.")
+        return None, None
+    return load_model_from_b64(model_b64, preprocessor_b64)
 
 def predict(features):
-    model = load_pickle(MODEL_PATH)
-    preprocessor = load_pickle(PREPROCESSOR_PATH)
-    features_processed = preprocessor.transform(features)
-    prediction = model.predict(features_processed)
-    return prediction
+    model, preprocessor = load_model()
+    
+    if model is None or preprocessor is None:
+        st.error("Error: Model not available. Please check your setup.")
+        return None
+        
+    try:
+        # Transform features using the preprocessor
+        features_processed = preprocessor.transform(features)
+        # Make prediction
+        prediction = model.predict(features_processed)
+        return prediction
+    except Exception as e:
+        st.error(f"Error during prediction: {str(e)}")
+        return None
 
 def home_page():
     # Hero Section
@@ -126,25 +141,10 @@ def data_analysis_page():
 
     # Load and prepare data
     try:
-        # Try multiple possible locations for the data file
-        current_dir = os.path.dirname(os.path.abspath(__file__))
-        possible_paths = [
-            os.path.join(current_dir, 'artifacts', 'raw.csv'),
-            os.path.join(current_dir, 'notebook', 'data', 'raw.csv'),
-            os.path.join(current_dir, 'notebook', 'cleaned_soil_analysis_data(1).csv')
-        ]
-        
-        df = None
-        for path in possible_paths:
-            try:
-                df = pd.read_csv(path)
-                st.success(f"Successfully loaded data from {path}")
-                break
-            except FileNotFoundError:
-                continue
-        
-        if df is None:
-            raise FileNotFoundError("Could not find the data file in any of the expected locations")
+        # Import and use sample data
+        from src.ENDTOENDDSPROJECT.data.sample_data import get_sample_data
+        df = get_sample_data()
+        st.success("Successfully loaded sample data")
             
         df.fillna(df.mean(numeric_only=True), inplace=True)
         
